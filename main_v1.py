@@ -93,7 +93,7 @@ pygame.mixer.init()
 # 3. CLASS CHÍNH: MEDIA CENTER (Tích hợp GameBoy từ main.py và Chat Bot từ chat_bot.py)
 # ==========================================
 
-GEMINI_API_KEY = "AIzaSyBFQc4ATm3WY5oD8BWHIsd3J4K8kxZ-GuY"  
+GEMINI_API_KEY = ""  
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 # Định nghĩa TONE_MARKERS cho dấu tiếng Việt
@@ -127,10 +127,10 @@ TONE_MARKERS = {
 }
 
 # --- Cấu hình Email ---
-sender_email = "ungdungthu3@gmail.com"
+sender_email = "@gmail.com"
 sender_name = 'pi_phone'
-sender_app_password = "sknt raic nnbx pfrr"
-recipient_email = ['dinhphuchd2008@gmail.com']
+sender_app_password = ""
+recipient_email = ['@gmail.com']
 current_email_index = 0
 email_subject = "Tin nhắn từ Myphone"
 
@@ -1725,3 +1725,4 @@ if __name__ == "__main__":
     app = PiMediaCenter()
 
     app.run()
+
