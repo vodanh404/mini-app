@@ -1723,4 +1723,5 @@ if __name__ == "__main__":
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
     app = PiMediaCenter()
+
     app.run()
