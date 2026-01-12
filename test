@@ -1,87 +1,50 @@
 #include <pybind11/pybind11.h>
-#include "st7789/ST7789_TFT.hpp"  // Adjust if the header is "ST7789_TFT.hpp" without subdir or "include/st7789/ST7789_TFT.hpp"
+#include "ST7789_TFT_LCD_RVL.hpp"  // Header chính
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(st7789_tft, m) {
-    m.doc() = "Python binding for ST7789_TFT_RPI library";  // Module description
+    m.doc() = "Python bindings for ST7789_TFT_RPI library";
 
     py::class_<ST7789_TFT>(m, "ST7789_TFT")
-        .def(py::init<>())  // Default Constructor: ST7789_TFT tft;
+        // Constructors
+        .def(py::init<uint8_t, uint8_t>(), py::arg("dc_pin"), py::arg("rst_pin"), "Constructor with DC and RESET pins")
+        .def(py::init<>(), "Default constructor")
 
-        // Setup and Initialization
-        .def("SetupGPIO", &ST7789_TFT::SetupGPIO, py::arg("spi_type"), 
-             "Configure GPIO. spi_type: 0=HW SPI, 1=SW SPI")
-        .def("InitSPI", &ST7789_TFT::InitSPI, py::arg("spi_speed"), py::arg("spi_ce"), py::arg("spi_delay"), 
-             "Initialize SPI interface. spi_speed is typically 8,000,000 - 80,000,000 Hz")
-        .def("InitScreenSize", &ST7789_TFT::InitScreenSize, py::arg("width"), py::arg("height"), py::arg("offset_x"), py::arg("offset_y"), 
-             "Set screen dimensions and offsets (e.g., 240, 240, 0, 0)")
+        // Initialization
+        .def("SetupGPIO", py::overload_cast<>(&ST7789_TFT::SetupGPIO), "Setup GPIO for default HW SPI")
+        .def("InitSPI", &ST7789_TFT::InitSPI, py::arg("channel"), py::arg("speed"), py::arg("ce_pin"), "Init hardware SPI (channel 0/1, speed Hz, CE 0/1)")
+        .def("InitScreenSize", &ST7789_TFT::InitScreenSize, py::arg("width"), py::arg("height"), py::arg("x_offset") = 0, py::arg("y_offset") = 0, "Set display size and offset")
+        .def("InitScreen", &ST7789_TFT::InitScreen, "Send init commands to ST7789 chip (must call after size/SPI)")
 
-        // Basic Graphics
-        .def("TFTfillScreen", &ST7789_TFT::TFTfillScreen, py::arg("color"), 
-             "Fill the entire screen with a color. color is uint16_t RGB565")
-        .def("TFTdrawPixel", &ST7789_TFT::TFTdrawPixel, py::arg("x"), py::arg("y"), py::arg("color"), 
-             "Draw a single pixel")
-        .def("TFTdrawLine", &ST7789_TFT::TFTdrawLine, py::arg("x0"), py::arg("y0"), py::arg("x1"), py::arg("y1"), py::arg("color"), 
-             "Draw a line between two points")
-        .def("TFTdrawRect", &ST7789_TFT::TFTdrawRect, py::arg("x"), py::arg("y"), py::arg("w"), py::arg("h"), py::arg("color"), 
-             "Draw an empty rectangle")
-        .def("TFTfillRect", &ST7789_TFT::TFTfillRect, py::arg("x"), py::arg("y"), py::arg("w"), py::arg("h"), py::arg("color"), 
-             "Draw a filled rectangle")
-        .def("TFTdrawCircle", &ST7789_TFT::TFTdrawCircle, py::arg("x"), py::arg("y"), py::arg("r"), py::arg("color"), 
-             "Draw a circle")
+        // Graphics
+        .def("fillScreen", &ST7789_TFT::fillScreen, py::arg("color"), "Fill entire screen with RGB565 color")
+        .def("drawPixel", &ST7789_TFT::drawPixel, py::arg("x"), py::arg("y"), py::arg("color"), "Draw single pixel")
+        .def("drawLine", &ST7789_TFT::drawLine, py::arg("x0"), py::arg("y0"), py::arg("x1"), py::arg("y1"), py::arg("color"), "Draw line")
+        .def("drawRect", &ST7789_TFT::drawRect, py::arg("x"), py::arg("y"), py::arg("w"), py::arg("h"), py::arg("color"), "Draw rectangle outline")
+        .def("fillRect", &ST7789_TFT::fillRect, py::arg("x"), py::arg("y"), py::arg("w"), py::arg("h"), py::arg("color"), "Fill rectangle")
+        .def("drawCircle", &ST7789_TFT::drawCircle, py::arg("x"), py::arg("y"), py::arg("r"), py::arg("color"), "Draw circle outline (if implemented)")
 
-        // Text and Fonts
-        .def("TFTsetFont", &ST7789_TFT::TFTsetFont, py::arg("font_id"), 
-             "Select a font from 1-15, refer to documentation for the font list")
-        .def("TFTprint", &ST7789_TFT::TFTprint, py::arg("text"), py::arg("x"), py::arg("y"), 
-             "Print text at specific coordinates. text is const char*")
-        .def("TFTsetTextColor", &ST7789_TFT::TFTsetTextColor, py::arg("fg_color"), py::arg("bg_color") = py::none(), 
-             "Set text foreground and optional background color")
+        // Text & Font
+        .def("setFont", &ST7789_TFT::setFont, py::arg("font_number"), "Select font (1-? depending on fonts included)")
+        .def("print", py::overload_cast<const char*, int16_t, int16_t>(&ST7789_TFT::print), py::arg("text"), py::arg("x"), py::arg("y"), "Print text at position")
 
-        // Bitmap and Icons
-        .def("TFTdrawBitmap", &ST7789_TFT::TFTdrawBitmap, py::arg("x"), py::arg("y"), py::arg("bitmap"), py::arg("w"), py::arg("h"), py::arg("color"), 
-             "Draw a monochrome bitmap. bitmap is const uint8_t*")
-        .def("TFTdrawBitmap24", &ST7789_TFT::TFTdrawBitmap24, py::arg("x"), py::arg("y"), py::arg("bitmap"), py::arg("w"), py::arg("h"), 
-             "Draw a 24-bit bitmap. bitmap is const uint8_t*")
+        // Bitmap (adjust if overloads differ)
+        .def("drawBitmap", &ST7789_TFT::drawBitmap, py::arg("x"), py::arg("y"), py::arg("bitmap"), py::arg("w"), py::arg("h"), py::arg("color"), "Draw 1-bit bitmap")
 
-        // Display Control
-        .def("TFTsetRotation", &ST7789_TFT::TFTsetRotation, py::arg("rotation"), 
-             "Set screen rotation: 0-3 (0: portrait, 1: landscape, etc.)")
-        .def("TFTinvertDisplay", &ST7789_TFT::TFTinvertDisplay, py::arg("invert"), 
-             "Invert display colors: true/false")
-        .def("TFTsleep", &ST7789_TFT::TFTsleep, py::arg("enable"), 
-             "Toggle sleep mode: true to enable sleep")
-        .def("TFTscroll", &ST7789_TFT::TFTscroll, py::arg("offset"), 
-             "Vertical scrolling offset")
-        
-        // Add more methods here if the header includes: TFTinitPCB(), TFTreset(), TFTbrightness(), etc.
+        // Display control
+        .def("setRotation", &ST7789_TFT::setRotation, py::arg("rotation"), "Set rotation 0-3")
+        .def("invertDisplay", &ST7789_TFT::invertDisplay, py::arg("invert"), "Invert colors")
+        .def("sleep", &ST7789_TFT::sleep, py::arg("enable"), "Sleep mode on/off")
+        // .def("scroll", &ST7789_TFT::scroll, py::arg("offset"), "Vertical scroll if supported")
+
         ;
 
-    // Expose Enums (Check header for specific enum types like Rotation or FontType)
+    // Enum for rotation (adjust type if header uses uint8_t or enum)
     py::enum_<uint8_t>(m, "Rotation")
         .value("DEG0", 0)
         .value("DEG90", 1)
         .value("DEG180", 2)
         .value("DEG270", 3)
-        .export_values();
-
-    // Font selection enum
-    py::enum_<uint8_t>(m, "Font")
-        .value("FONT1", 1)
-        .value("FONT2", 2)
-        .value("FONT3", 3)
-        .value("FONT4", 4)
-        .value("FONT5", 5)
-        .value("FONT6", 6)
-        .value("FONT7", 7)
-        .value("FONT8", 8)
-        .value("FONT9", 9)
-        .value("FONT10", 10)
-        .value("FONT11", 11)
-        .value("FONT12", 12)
-        .value("FONT13", 13)
-        .value("FONT14", 14)
-        .value("FONT15", 15)
         .export_values();
 }
