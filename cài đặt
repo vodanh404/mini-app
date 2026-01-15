@@ -1,0 +1,26 @@
+sudo nano /etc/systemd/system/miniapp.service
+
+[Unit]
+Description=Mini App Startup Service
+After=network.target local-fs.target
+[Service]
+User=dinhphuc
+Group=dinhphuc
+WorkingDirectory=/home/dinhphuc/my_project
+
+ExecStart=/home/dinhphuc/my_project/library/bin/python main_mini_app.py
+
+Restart=always
+RestartSec=5
+
+Environment=PYTHONUNBUFFERED=1
+Environment=SDL_AUDIODRIVER=pulse
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DISPLAY=:0
+Environment=SDL_VIDEODRIVER=dummy
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload
+sudo systemctl restart miniapp.service
+journalctl -u miniapp.service -f
