@@ -9,7 +9,7 @@ import subprocess
 # --- Cấu hình ---
 USER_HOME = "/home/dinhphuc"
 VIDEO_DIR = os.path.join(USER_HOME, "Videos")
-WIDTH, HEIGHT = 240, 320
+WIDTH, HEIGHT = 320,240  # Đảm bảo đúng tỉ lệ màn hình của bạn
 DC_PIN, RST_PIN = 24, 25
 
 # --- Khởi tạo SPI & GPIO ---
@@ -31,36 +31,38 @@ def write_data(data):
     spi.writebytes(data)
 
 def init_display():
-    GPIO.output(RST_PIN, GPIO.LOW); time.sleep(0.05)
-    GPIO.output(RST_PIN, GPIO.HIGH); time.sleep(0.05)
-    write_cmd(0x01); time.sleep(0.15)
-    write_cmd(0x11); time.sleep(0.1)
-    write_cmd(0x3A); write_data([0x05])
-    write_cmd(0x36); write_data([0x00])
+    # Reset vật lý
+    GPIO.output(RST_PIN, GPIO.LOW); time.sleep(0.1)
+    GPIO.output(RST_PIN, GPIO.HIGH); time.sleep(0.1)
+    
+    write_cmd(0x01); time.sleep(0.15) # Software Reset
+    write_cmd(0x11); time.sleep(0.1)  # Sleep Out
+    
+    # 1. SỬA NGƯỢC MÀU (Inversion Control)
+    # Nếu màu bị âm bản (ví dụ màu trắng thành đen), hãy thử đổi 0x21 thành 0x20
+    write_cmd(0x21) # Display Inversion ON (Thử 0x20 nếu vẫn sai)
+    
+    write_cmd(0x3A); write_data([0x05]) # 16-bit RGB565
+    
+    # 2. SỬA QUAY SAI HƯỚNG (MADCTL)
+    # Các giá trị phổ biến: 
+    # 0x00: Dọc (Portrait)
+    # 0x60: Ngang (Landscape)
+    # 0xC0: Dọc ngược (Portrait Inverted)
+    # 0xA0: Ngang ngược (Landscape Inverted)
+    write_cmd(0x36); write_data([0x60]) 
+    
+    # Thiết lập Window hiển thị
     write_cmd(0x2A); write_data([0x00, 0x00, (WIDTH-1) >> 8, (WIDTH-1) & 0xFF])
     write_cmd(0x2B); write_data([0x00, 0x00, (HEIGHT-1) >> 8, (HEIGHT-1) & 0xFF])
-    write_cmd(0x21); write_cmd(0x29)
-    print("Màn hình ST7789 đã sẵn sàng.")
-
-def frame_to_rgb565(frame):
-    """Chuyển đổi frame sang RGB565 tối ưu"""
-    frame = cv2.resize(frame, (WIDTH, HEIGHT))
-    b, g, r = cv2.split(frame)
-    rgb = ((r.astype(np.uint16) & 0xF8) << 8) | \
-          ((g.astype(np.uint16) & 0xFC) << 3) | \
-          (b.astype(np.uint16) >> 3)
-    return rgb.flatten()
-
-def get_videos():
-    exts = ('.mp4', '.avi', '.mkv', '.webm')
-    return [os.path.join(VIDEO_DIR, f) for f in os.listdir(VIDEO_DIR) if f.lower().endswith(exts)]
+    
+    write_cmd(0x29) # Display On
+    print("Màn hình đã khởi tạo với cấu hình mới.")
 
 def play_video(video_path):
-    """Sử dụng FFmpeg để pipe dữ liệu vào OpenCV nếu cần, tránh lỗi AV1"""
-    print(f"\nĐang xử lý: {os.path.basename(video_path)}")
+    print(f"\nĐang phát: {os.path.basename(video_path)}")
     
-    # Dùng FFmpeg để giải mã video và đẩy luồng raw thô sang Pipe
-    # Cách này giúp bỏ qua việc OpenCV phải tự giải mã AV1 lỗi thời
+    # FFmpeg giải mã và scale đúng kích thước
     command = [
         'ffmpeg',
         '-i', video_path,
@@ -68,61 +70,50 @@ def play_video(video_path):
         '-pix_fmt', 'bgr24',
         '-vcodec', 'rawvideo',
         '-vf', f'scale={WIDTH}:{HEIGHT}',
-        '-an', '-', # '-' nghĩa là đẩy ra stdout
+        '-an', '-', 
         '-loglevel', 'quiet'
     ]
     
     pipe = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=WIDTH*HEIGHT*3)
     
-    frames = 0
-    start_t = time.time()
-
     try:
         while True:
-            # Đọc đúng số lượng byte cho 1 frame (W*H*3 kênh màu)
             raw_frame = pipe.stdout.read(WIDTH * HEIGHT * 3)
             if not raw_frame:
                 break
             
-            # Chuyển byte thô thành mảng NumPy
             frame = np.frombuffer(raw_frame, dtype='uint8').reshape((HEIGHT, WIDTH, 3))
             
-            # Chuyển sang RGB565 (đã resize sẵn trong ffmpeg nên bước này cực nhanh)
+            # Chuyển đổi sang RGB565
             b, g, r = cv2.split(frame)
+            # Dùng uint16 để tránh tràn bit
             data = ((r.astype(np.uint16) & 0xF8) << 8) | \
                    ((g.astype(np.uint16) & 0xFC) << 3) | \
                    (b.astype(np.uint16) >> 3)
 
-            # Đẩy lên màn hình
+            # Đẩy dữ liệu qua SPI
             write_cmd(0x2C)
             GPIO.output(DC_PIN, GPIO.HIGH)
             spi.writebytes2(data.byteswap().tobytes())
-            
-            frames += 1
-            if time.time() - start_t >= 1.0:
-                print(f"FPS: {frames}", end='\r')
-                frames = 0
-                start_t = time.time()
                 
     except Exception as e:
-        print(f"Lỗi khi phát: {e}")
+        print(f"Lỗi: {e}")
     finally:
         pipe.terminate()
 
-# --- Vòng lặp chính ---
+# --- Thực thi ---
 init_display()
-videos = get_videos()
-
-if not videos:
-    print(f"Không tìm thấy video trong {VIDEO_DIR}!")
-    exit()
+video_files = [os.path.join(VIDEO_DIR, f) for f in os.listdir(VIDEO_DIR) if f.lower().endswith(('.mp4', '.mkv', '.avi'))]
 
 try:
-    while True:
-        for v in videos:
-            play_video(v)
+    if not video_files:
+        print("Không có video!")
+    else:
+        while True:
+            for v in video_files:
+                play_video(v)
 except KeyboardInterrupt:
-    print("\nĐã dừng chương trình.")
+    print("\nDừng.")
 finally:
     spi.close()
     GPIO.cleanup()
