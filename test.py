@@ -40,7 +40,7 @@ def init_display():
     
     # 1. SỬA NGƯỢC MÀU (Inversion Control)
     # Nếu màu bị âm bản (ví dụ màu trắng thành đen), hãy thử đổi 0x21 thành 0x20
-    write_cmd(0x21) # Display Inversion ON (Thử 0x20 nếu vẫn sai)
+    write_cmd(0x20) # Display Inversion ON (Thử 0x20 nếu vẫn sai)
     
     write_cmd(0x3A); write_data([0x05]) # 16-bit RGB565
     
